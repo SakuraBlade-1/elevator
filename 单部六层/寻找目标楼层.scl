@@ -1,0 +1,61 @@
+// 电梯上行状态：
+IF "output"."1号梯上行接触器" THEN
+    #电梯层位 := "mid_var".电梯位置 / 100;
+    
+    FOR #i := #电梯层位 + 1 TO 6 DO
+        IF "mid_var".外层上呼[#i] OR "mid_var".桥箱内需[#i] THEN
+            #寻找目标楼层 := #i;
+            RETURN;  // 寻找到目标直接return终止函数，返回i楼层.
+        END_IF;
+    END_FOR;
+    #寻找目标楼层 := 0;  // 正在运行中，运行方向没有正向需求，明确返回0；之后的函数：如果值是0，则不更新目标
+    
+    // 电梯下行状态 (理论上电梯位置 > 100)
+ELSIF "output"."1号梯下行接触器" THEN
+    #电梯层位 := "mid_var".电梯位置 / 100;
+    
+    // 倒着数，所以是by -1
+    FOR #i := #电梯层位 TO 1 BY -1 DO
+        IF "mid_var".外层下呼[#i] OR "mid_var".桥箱内需[#i] THEN
+            #寻找目标楼层 := #i;
+            RETURN;
+        END_IF;
+    END_FOR;
+    #寻找目标楼层 := 0;
+    
+    // 电梯停止的情况  // 采用 LOOK 算法
+ELSE
+    #电梯层位 := "mid_var".电梯位置 / 100;
+    
+    IF "mid_var".将要运行方向 THEN  // true 为向上
+        // 检查平层
+        IF "mid_var".外层上呼[#电梯层位] OR "mid_var".桥箱内需[#电梯层位] THEN
+            #寻找目标楼层 := #电梯层位;
+            RETURN;
+        END_IF;
+        
+        // 向上搜索，从上往下
+        FOR #i := 6 TO #电梯层位 BY -1 DO
+            IF "mid_var".外层上呼[#i] OR "mid_var".桥箱内需[#i] OR "mid_var".外层下呼[#i] THEN
+                #寻找目标楼层 := #i;
+                RETURN;
+            END_IF;
+        END_FOR;
+        
+    ELSE  // 向下扫描
+        // 检查平层
+        IF "mid_var".桥箱内需[#电梯层位] OR "mid_var".外层下呼[#电梯层位] THEN
+            #寻找目标楼层 := #电梯层位;
+            RETURN;
+        END_IF;
+        
+        // 向下搜索，从下往上
+        FOR #i := 1 TO #电梯层位 DO
+            IF "mid_var".外层下呼[#i] OR "mid_var".外层上呼[#i] OR "mid_var".桥箱内需[#i] THEN
+                #寻找目标楼层 := #i;
+                RETURN;
+            END_IF;
+        END_FOR;
+    END_IF;
+    #寻找目标楼层 := #电梯层位;  // 如果上下都没有需求就是当前楼层
+END_IF;
